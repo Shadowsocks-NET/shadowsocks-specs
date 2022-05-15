@@ -76,9 +76,9 @@ plaintext := aead.open(nonce: counter, ciphertext)
 
 #### 3.1.2. Format
 
-The request stream starts with a random salt, followed repeatedly by one length chunk and one payload chunk. Each chunk is independently encrypted/decrypted using the AEAD cipher. After each encryption/decryption operation, the nonce MUST be incremented by 1.
+A request stream starts with one random salt and two header chunks, followed repeatedly by one length chunk and one payload chunk. Each chunk is independently encrypted/decrypted using the AEAD cipher. After each encryption/decryption operation, the nonce MUST be incremented by 1.
 
-The random salt, the first length chunk and the first payload chunk MUST be buffered and sent in one write call to the underlying socket. Separate writes can lead to predictable packet sizes, which could potentially be used to detect the protocol.
+A response stream has the same structure, except there's only one fixed-length header chunk, which also acts as the first length chunk.
 
 The length chunk contains a 16-bit big-endian unsigned integer that describes the payload length in the next payload chunk. Servers and clients use this information to read the next payload chunk. The payload length is up to 0xFFFF (65535) bytes. The 0x3FFF length cap in Shadowsocks AEAD has been dropped in this edition.
 
@@ -95,36 +95,44 @@ The length chunk contains a 16-bit big-endian unsigned integer that describes th
 |   variable    |
 +---------------+
 
-+--------+------------------------+---------------------------+---+
-|  salt  | encrypted length chunk |  encrypted payload chunk  |...|
-+--------+------------------------+---------------------------+---+
-| 16/32B |  2B length + 16B tag   | variable length + 16B tag |...|
-+--------+------------------------+---------------------------+---+
+Request stream:
++--------+------------------------+---------------------------+------------------------+---------------------------+---+
+|  salt  | encrypted header chunk |  encrypted header chunk   | encrypted length chunk |  encrypted payload chunk  |...|
++--------+------------------------+---------------------------+------------------------+---------------------------+---+
+| 16/32B |     11B + 16B tag      | variable length + 16B tag |  2B length + 16B tag   | variable length + 16B tag |...|
++--------+------------------------+---------------------------+------------------------+---------------------------+---+
+
+Response stream:
++--------+------------------------+---------------------------+------------------------+---------------------------+---+
+|  salt  | encrypted header chunk |  encrypted payload chunk  | encrypted length chunk |  encrypted payload chunk  |...|
++--------+------------------------+---------------------------+------------------------+---------------------------+---+
+| 16/32B |    27/43B + 16B tag    | variable length + 16B tag |  2B length + 16B tag   | variable length + 16B tag |...|
++--------+------------------------+---------------------------+------------------------+---------------------------+---+
 ```
 
 #### 3.1.3. Header
 
-The first payload chunk of a request stream contains header and payload. If payload is not available, add non-zero random length padding.
-
-For client implementations, a simple approach is to always send random length padding. To accommodate TCP Fast Open (TFO), clients MAY wait a short amount of time (typically less than one second) for client-first protocols to write the first payload, before carrying on to establish a proxy connection and write the header.
-
-Servers MUST reject the request if the first payload chunk does not contain payload and the padding length is 0.
-Servers MUST enforce that the request header (including padding) does not extend beyond the first payload chunk.
-
-For response streams, the header is always sent along with payload. No padding is needed.
-
 ```
-+------+---------------+------+----------+-------+----------------+----------+
-| type |   timestamp   | ATYP |  address |  port | padding length |  padding |
-+------+---------------+------+----------+-------+----------------+----------+
-|  1B  | 8B unix epoch |  1B  | variable | u16be |     u16be      | variable |
-+------+---------------+------+----------+-------+----------------+----------+
+Request fixed-length header:
++------+---------------+--------+
+| type |   timestamp   | length |
++------+---------------+--------+
+|  1B  | 8B unix epoch |  u16be |
++------+---------------+--------+
 
-+------+---------------+----------------+
-| type |   timestamp   |  request salt  |
-+------+---------------+----------------+
-|  1B  | 8B unix epoch |     16/32B     |
-+------+---------------+----------------+
+Request variable-length header:
++------+----------+-------+----------------+----------+-----------------+
+| ATYP |  address |  port | padding length |  padding | initial payload |
++------+----------+-------+----------------+----------+-----------------+
+|  1B  | variable | u16be |     u16be      | variable |    variable     |
++------+----------+-------+----------------+----------+-----------------+
+
+Response fixed-length header:
++------+---------------+----------------+--------+
+| type |   timestamp   |  request salt  | length |
++------+---------------+----------------+--------+
+|  1B  | 8B unix epoch |     16/32B     |  u16be |
++------+---------------+----------------+--------+
 
 HeaderTypeClientStream = 0
 HeaderTypeServerStream = 1
@@ -134,8 +142,30 @@ MaxPaddingLength = 900
 
 - 1-byte type: Differentiates between client and server messages. A request stream has type `0`. A response stream has type `1`.
 - 8-byte Unix epoch timestamp: Messages with over 30 seconds of time difference MUST be treated as replay.
+- Length: Indicates the next chunk's plaintext length (not including the authentication tag).
 - ATYP + address + port: Target address in [SOCKS5 address format](https://datatracker.ietf.org/doc/html/rfc1928#section-5).
 - Request salt in response header: This maps a response stream to a request stream. The client MUST check this field in response header against the request salt.
+
+#### 3.1.3. Detection Prevention
+
+The random salt and header chunks MUST be buffered and sent in one write call to the underlying socket. Separate writes can lead to predictable packet sizes, which could potentially be used to detect the protocol.
+
+To process the salt and the fixed-length header, servers and clients MUST make exactly one read call. If the amount of data received is not enough for decryption, or decryption fails, or header validation fails, the server MUST act in a way that does not exhibit the amount of bytes consumed by the server. This defends against probes that send one byte at a time to detect how many bytes the server consumes before closing the connection.
+
+In such circumstances, do not immediately close the socket. Closing the socket with unread data causes RST to be sent. This reveals the exact number of bytes consumed by the server. Implementations MAY choose to employ one of the following strategies:
+
+1. To consistently send RST even when the receive buffer is empty, set `SO_LINGER` to true with a zero timeout, then close the socket.
+2. To consistently send FIN even when the receive buffer has unread data, shut down the write half of the connection by calling `shutdown(SHUT_WR)`, then drain the connection for any further received data.
+3. To consistently send FIN even when the receive buffer has unread data, but disallow unlimited writes, shut down the write half of the connection by calling `shutdown(SHUT_WR)`, then `epoll` for `EPOLLRDHUP`. Read until EOF then close the connection. This limits the amount of data the other party can send to the size of your socket receive buffer.
+
+In a request header, either initial payload or padding MUST be present. When making a request header, if payload is not available, add non-zero random length padding.
+
+For client implementations, a simple approach is to always send random length padding. To accommodate TCP Fast Open (TFO), clients MAY wait a short amount of time (typically less than one second) for client-first protocols to write the first payload, before carrying on to establish a proxy connection and write the header.
+
+Servers MUST reject the request if the first payload chunk does not contain payload and the padding length is 0.
+Servers MUST enforce that the request header (including padding) does not extend beyond the first payload chunk.
+
+For response streams, the header is always sent along with payload. No padding is needed.
 
 #### 3.1.4. Replay Protection
 
