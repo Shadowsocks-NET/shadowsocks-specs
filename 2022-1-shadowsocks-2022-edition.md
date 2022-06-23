@@ -177,9 +177,11 @@ For salt storage, implementations MUST NOT use Bloom filters or anything that co
 
 ### 3.2. UDP
 
-UDP packets are routed to relay sessions based on source address and port. Each time the proxy receives a packet from a new source address and port, it opens a new relay session, and subsequent packets from that source are sent over the same session.
-
 Shadowsocks 2022 completely overhauled UDP relay. Each UDP relay session has a unique session ID, which is also used as salt to derive the session subkey. A packet ID acts as packet counter for the session. The session ID and packet ID are combined and encrypted in a separate header.
+
+Clients create UDP relay sessions based on source address and port. When a client receives a packet from a new source address and port, it opens a new relay session, and subsequent packets from that source are sent over the same session.
+
+Servers manage UDP relay sessions by session ID. Each client session corresponds to one outgoing UDP socket on the server.
 
 #### 3.2.1. Encryption and Decryption
 
@@ -222,7 +224,7 @@ Servers use client session IDs to identify UDP sessions. For server-to-client me
 
 #### 3.2.3. Main Header
 
-The main header, or message header, is the header at the start of the body. The client-to-server message header consists of type, timestamp, padding and SOCKS address. The server-to-client message header has an additional client session ID field.
+The main header, or message header, is the header at the start of the body. The client-to-server message header consists of type, timestamp, padding and SOCKS address. The server-to-client message header has an additional client session ID field, which maps the server session to a client session.
 
 ```
 Client-to-server message header:
@@ -243,17 +245,21 @@ HeaderTypeClientPacket = 0
 HeaderTypeServerPacket = 1
 ```
 
+- 1-byte type: Differentiates between client and server messages. A client message has type `0`. A server message has type `1`.
+- 8-byte Unix epoch timestamp: Messages with over 30 seconds of time difference MUST be treated as replay.
+- Padding length: Specifies the length of the optional padding. Implementations MAY allow users to select from a list of predefined padding policies. Care SHOULD be taken to not exceed the network path's MTU when padding packets.
+
 #### 3.2.4. Session ID based Routing and Sliding Window Replay Protection
 
-Servers SHOULD use client session IDs as keys in the NAT table.
+Servers MUST route packets based on client session ID, not packet source address. When a server receives a packet with a new client session ID, a new relay session is created, and subsequent packets from that client session are sent over this relay session.
 
-A server NAT entry SHOULD cache the session AEAD ciphers for encrypting and decrypting packets.
+A relay session MUST keep track of the last seen client address. When a packet is received from the client and is successfully validated, the last seen client address MUST be updated. Return packets MUST be sent to this address. This allows UDP sessions to survive client network changes.
 
-A server NAT entry SHOULD keep track of the last seen client address. When a packet is received from the client and is successfully validated, the last seen client address SHOULD be updated. Return packets SHOULD be sent to this address. This allows UDP sessions to survive client network changes.
+Each relay session MUST be remembered for at least 60 seconds. A shorter NAT timeout may allow attackers to successfully replay packets from an already forgotten client session.
 
-A server NAT entry MUST implement a sliding window filter that checks the packet ID for duplicate or out-of-window packets.
+To handle server restarts, clients MUST allow each client session to be associated with more than one server session. Each association MUST be remembered for no less than the NAT timeout, which is at least 60 seconds. Alternatively, clients MAY choose to keep track of one old server session and one current server session, and reject newer server sessions when the last packet received from the old session is less than 1 minute old.
 
-Clients SHOULD use a map with a timeout no less than the NAT timeout to keep track of server sessions. Alternatively, clients MAY choose to keep track of one old server session and one current server session, and reject new server sessions, when the last packet received from the old session is less than 1 minute old.
+Clients and servers MUST employ a sliding window filter for each relay session to check incoming packets for duplicate or out-of-window packet IDs. Existing implementations from WireGuard MAY be used. The check MUST be performed after header validation, which filters out packets that are semantically invalid or have a bad timestamp.
 
 ## 4. Optional Methods
 
