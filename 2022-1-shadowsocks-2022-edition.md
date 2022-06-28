@@ -171,9 +171,13 @@ For response streams, the header is always sent along with payload. No padding i
 
 #### 3.1.4. Replay Protection
 
-Servers and clients MUST store all incoming salts for 60 seconds. When a new TCP session is established, the first received message is decrypted and its timestamp MUST be checked against system time. If the time difference is within 30 seconds, then the salt is checked against all stored salts. If no repeated salt is discovered, then the salt is added to the pool and the session is successfully established.
+Servers MUST store all incoming salts for 60 seconds. When a new TCP session is established, the first received message is decrypted and its timestamp MUST be checked against system time. If the time difference is within 30 seconds, then the salt is checked against all stored salts. If no repeated salt is discovered, then the salt is added to the pool and the session is successfully established.
 
-For salt storage, implementations MUST NOT use Bloom filters or anything that could return a false positive result.
+Some techniques in implementations of previous editions are no longer necessary and SHOULD NOT be implemented for Shadowsocks 2022:
+
+- Clients do not need to check the salt in response streams, because the response header includes an associated request salt.
+- Outgoing salts do not need to be added to the salt pool, because the header has a type field that indicates the direction of the stream.
+- For salt storage, implementations MUST NOT use Bloom filters or anything that could return a false positive result, because salts only have to be stored for 60 seconds.
 
 ### 3.2. UDP
 
@@ -259,7 +263,7 @@ Each relay session MUST be remembered for at least 60 seconds. A shorter NAT tim
 
 To handle server restarts, clients MUST allow each client session to be associated with more than one server session. Each association MUST be remembered for no less than the NAT timeout, which is at least 60 seconds. Alternatively, clients MAY choose to keep track of one old server session and one current server session, and reject newer server sessions when the last packet received from the old session is less than 1 minute old.
 
-Clients and servers MUST employ a sliding window filter for each relay session to check incoming packets for duplicate or out-of-window packet IDs. Existing implementations from WireGuard MAY be used. The check MUST be performed after header validation, which filters out packets that are semantically invalid or have a bad timestamp.
+Clients and servers MUST employ a sliding window filter for each relay session to check incoming packets for duplicate or out-of-window packet IDs. Existing implementations from WireGuard MAY be used. The packet ID MAY be checked as soon as the separate header is decrypted, but the sliding window state MUST NOT be updated before successful header validation, which filters out packets that are semantically invalid or have a bad timestamp.
 
 ## 4. Optional Methods
 
