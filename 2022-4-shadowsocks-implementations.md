@@ -4,16 +4,37 @@ This document tracks and compares implementations of Shadowsocks 2022 by feature
 
 ## 1. Implementations
 
+### 1.1. Reference Implementations
+
 Reference implementations of Shadowsocks 2022 are fully spec-compliant, performance-optimized, and ready for production.
 
-|     | shadowsocks-rust | sing-shadowsocks |
-| --- | ---------------: | ---------------: |
-| Description | CLIs and libraries written in Rust. | CLIs and libraries written in Go. |
-| URL | https://github.com/shadowsocks/shadowsocks-rust | https://github.com/SagerNet/sing-shadowsocks, https://github.com/SagerNet/sing-tools |
-| Server | ✅ | ✅ |
-| Relay  | ❌ | ✅ |
-| Client | ✅ | ✅ |
-| [EIH (Extensible Identity Headers)](2022-2-shadowsocks-2022-extensible-identity-headers.md) | ❌ | ✅ |
+|     | shadowsocks-go | shadowsocks-rust | sing-box |
+| --- | -------------: | ---------------: | -------: |
+| Description | A versatile and efficient proxy platform for secure communications. | CLIs and libraries written in Rust. | The universal proxy platform. |
+| URL | https://github.com/database64128/shadowsocks-go | https://github.com/shadowsocks/shadowsocks-rust | https://github.com/SagerNet/sing-shadowsocks, https://github.com/SagerNet/sing-box |
+| License | AGPLv3 | MIT | GPLv3 |
+| Server  | ✅ | ✅ | ✅ |
+| Relay   | ❌ | ❌ | ✅ |
+| Client  | ✅ | ✅ | ✅ |
+| [EIH (Extensible Identity Headers)](2022-2-shadowsocks-2022-extensible-identity-headers.md) | ✅ | ✅ | ✅ |
+
+### 1.2. Derived Implementations
+
+Derived implementations are based on one of the reference implementations but developed separately by downstream developers.
+
+|     | v2ray-core (SagerNet Fork) | Xray-core |
+| --- | -------------------------: | --------: |
+| URL | https://github.com/SagerNet/v2ray-core | https://github.com/XTLS/Xray-core |
+| Protocol Implementation | sing-shadowsocks | sing-shadowsocks |
+| License | GPLv3 | MPLv2 |
+| Server  | ✅ | ✅ |
+| Relay   | ✅ | ✅ |
+| Client  | ✅ | ✅ |
+| [EIH (Extensible Identity Headers)](2022-2-shadowsocks-2022-extensible-identity-headers.md) | ✅ | ✅ |
+
+### 1.3. GUI Clients
+
+### 1.4. Other Implementations
 
 ## 2. Benchmarks
 
