@@ -11,6 +11,10 @@ This repo contains specs of the Shadowsocks protocol family.
 3. [Shadowsocks Server Configuration URL](2022-3-shadowsocks-url.md)
 4. [Shadowsocks 2022 Implementations](2022-4-shadowsocks-implementations.md)
 
+### 2023
+
+1. [Shadowsocks Server Management API v1](2023-1-shadowsocks-server-management-api-v1.md)
+
 ## How to Propose New Protocols
 
 Open an issue or a discussion if you have something in mind and would like to discuss with the community.
