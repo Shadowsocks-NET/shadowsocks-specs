@@ -19,14 +19,18 @@ identity_header := aes_encrypt(key: identity_subkey, plaintext: plaintext)
 
 ## UDP
 
-In UDP packets, identity headers are located between the separate header (session ID, packet ID) and AEAD ciphertext.
+In UDP request packets, identity headers are located between the separate header (session ID, packet ID) and AEAD ciphertext.
+
+Response packets do not have identity headers.
 
 ```
 plaintext := blake3::hash(iPSKn+1)[0..16] ^ session_id_packet_id // XOR to make it different for each packet.
 identity_header := aes_encrypt(key: iPSKn, plaintext: plaintext)
 ```
 
-When iPSKs are used, the separate header MUST be encrypted with the first iPSK. Each identity processor MUST decrypt and re-encrypt the separate header with the next layer's PSK.
+For request packets, when iPSKs are used, the separate header MUST be encrypted with the first iPSK. Each identity processor MUST decrypt and re-encrypt the separate header with the next layer's PSK.
+
+For response packets, no special handling is needed for the separate header. The server encrypts the separate header with the user's PSK, per the base spec. Identity processors MUST forward response packets directly to clients without parsing or modifying them.
 
 ## Scenarios
 
