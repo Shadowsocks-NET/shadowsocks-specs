@@ -224,7 +224,7 @@ Separate header:
 
 UDP sessions are initiated by clients. To start a UDP session, the client generates a new random session ID and maintains a counter starting at zero as packet ID. These are used in client-to-server messages and are usually referred to as client session ID and client packet ID.
 
-Servers use client session IDs to identify UDP sessions. For server-to-client messages, a different set of session ID and packet ID is used, and may be referred to as server session ID and server packet ID. Servers MUST not use client session IDs as server session IDs.
+Servers use client session IDs to identify UDP sessions. For server-to-client messages, a different set of session ID and packet ID is used, and may be referred to as server session ID and server packet ID. Like the client session ID, the server session ID MUST be randomly generated.
 
 #### 3.2.3. Main Header
 
