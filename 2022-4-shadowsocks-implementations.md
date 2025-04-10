@@ -60,14 +60,27 @@ BenchmarkDraftSeparateHeaderAes256GcmEncryption-8         	 2059383	       590.5
 BenchmarkDraftXChaCha20Poly1305Encryption-8               	  993336	      1266 ns/op	       0 B/op	       0 allocs/op
 ```
 
-### 2.3. shadowsocks-rust Speed Tests
+### 2.3. Speed Tests
 
-|       shadowsocks-rust        |   TCP    |   UDP    |
+- CPU: i9-13900K
+- Linux: 6.0.8-arch1-1
+- shadowsocks-go: commit 88c2d63ccd0b022f76902195ceb1559eaf15a3a7 (2022-11-13) built with Go 1.19.3
+- shadowsocks-rust: commit ff3590a830a84b4ee4f4b98623897487eed43196 (2022-11-21) built with Rust 1.65
+- TCP: `iperf3 -c ::1 -p 30001 -R`
+- UDP 🔽: `iperf3 -c ::1 -p 30001 -Rub 0 -l 1382`
+- UDP 🔼: `iperf3 -c ::1 -p 30001 -ub 0 -l 1390`
+
+| 2022-blake3-aes-128-gcm |      TCP |   UDP 🔽 |   UDP 🔼 |
+| ----------------------- | -------: | -------: | -------: |
+| shadowsocks-go          | 31.0Gbps | 5.20Gbps | 6.03Gbps |
+| shadowsocks-rust        | 27.7Gbps | 4.32Gbps | 4.38Gbps |
+
+|       shadowsocks-rust        |   TCP    |   UDP 🔽 |
 | ----------------------------- | -------: | -------: |
-| 2022-blake3-aes-128-gcm       | 12.2Gbps | 14.2Gbps |
-| 2022-blake3-aes-256-gcm       | 10.9Gbps | 12.5Gbps |
-| 2022-blake3-chacha20-poly1305 | 8.05Gbps | 2.35Gbps |
-| 2022-blake3-chacha8-poly1305  | 8.36Gbps | 2.60Gbps |
-| aes-128-gcm                   | 8.99Gbps | 13.5Gbps |
-| aes-256-gcm                   | 8.21Gbps | 11.9Gbps |
-| chacha20-poly1305             | 6.55Gbps | 8.66Gbps |
+| 2022-blake3-aes-128-gcm       | 27.7Gbps | 4.32Gbps |
+| 2022-blake3-aes-256-gcm       | Gbps | Gbps |
+| 2022-blake3-chacha20-poly1305 | Gbps | Gbps |
+| 2022-blake3-chacha8-poly1305  | Gbps | Gbps |
+| aes-128-gcm                   | Gbps | Gbps |
+| aes-256-gcm                   | Gbps | Gbps |
+| chacha20-poly1305             | Gbps | Gbps |
